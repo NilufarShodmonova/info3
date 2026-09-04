@@ -726,7 +726,9 @@
     searchQuery = inp.value;
     clearTimeout(searchDebounce);
     animateGridUpdate();
-    closeKeyboard();
+    // keep typing: the button runs the query and leaves the keyboard up
+    openKeyboard();
+    inp.focus({ preventScroll:true });
   }
 
   function clearSearch(){
@@ -873,10 +875,22 @@
       kbType(key.getAttribute('data-k'));
     });
 
-    // tapping anywhere outside the keyboard / bottom bar dismisses it
+    // Tapping anywhere outside the keyboard / bottom bar dismisses it -- but
+    // judged by where the finger landed, not by the click target. Opening the
+    // keyboard slides the bar up and the keyboard in, so on the very tap that
+    // opens it the element under the finger has moved by the time the button is
+    // released; the browser then reports the click on the common ancestor of
+    // press and release, which sits outside both and used to dismiss the
+    // keyboard the instant the search field raised it.
+    let kbPressTarget = null;
+    document.addEventListener('pointerdown', (e)=>{ kbPressTarget = e.target; }, true);
+
     document.addEventListener('click', (e)=>{
+      const pressed = kbPressTarget || e.target;   // no pointerdown => keyboard-driven click
+      kbPressTarget = null;
       if(!document.body.classList.contains('kb-open')) return;
-      if(e.target.closest('#vkeyboard') || e.target.closest('.bottom-bar')) return;
+      if(!pressed.closest) return;
+      if(pressed.closest('#vkeyboard') || pressed.closest('.bottom-bar')) return;
       closeKeyboard();
     });
   })();
