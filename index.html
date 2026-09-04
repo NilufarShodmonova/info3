@@ -759,6 +759,8 @@
   function showScreen(name){
     document.getElementById('screen-landing').classList.toggle('hidden', name !== 'landing');
     document.getElementById('screen-content').classList.toggle('hidden', name !== 'content');
+    // the splash *is* the locked state, so the idle timer only runs on content
+    if(name === 'content') resetIdleTimer(); else stopIdleTimer();
   }
 
   function goToContent(lang){
@@ -1213,6 +1215,45 @@
       e.preventDefault();
     }, { passive:false });
   });
+
+  /* ================= kiosk: idle auto-lock ================= */
+  // Five minutes untouched and the kiosk returns to the splash the way a phone
+  // locks itself, so the next visitor always starts from a clean screen. The
+  // splash is the locked state, so the timer is only armed on the content
+  // screen -- showScreen() starts it there and clears it on the way back.
+  const IDLE_LOCK_MS = 5 * 60 * 1000;
+  let idleTimer = null;
+
+  function resetIdleTimer(){
+    if(idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(lockToSplash, IDLE_LOCK_MS);
+  }
+
+  function stopIdleTimer(){
+    if(idleTimer){ clearTimeout(idleTimer); idleTimer = null; }
+  }
+
+  function lockToSplash(){
+    idleTimer = null;
+    // goToLanding() leaves the lightbox alone (the back button is unreachable
+    // underneath it), so drop it here -- instantly, since nobody is watching.
+    const lb = document.getElementById('lightboxOverlay');
+    if(lb.classList.contains('open')){
+      lb.classList.remove('show');
+      lb.classList.remove('open');
+      lbReset();
+    }
+    goToLanding();   // closes the modal and keyboard, then clears the timer
+  }
+
+  // Any sign of life restarts the countdown. Capture phase so a handler that
+  // stops propagation still counts, and `scroll` (which does not bubble) is
+  // seen when the document list is dragged. The `idleTimer` guard is what keeps
+  // the lock switched off on the splash: with no timer armed, nothing arms one.
+  ['pointerdown','pointermove','pointerup','keydown','wheel','touchstart','touchmove','scroll']
+    .forEach((t)=>{
+      document.addEventListener(t, ()=>{ if(idleTimer) resetIdleTimer(); }, { capture:true, passive:true });
+    });
 
   /* ================= click sound ================= */
   // Inlined as a data URI so the page stays a single self-contained file — no
